@@ -1,0 +1,14 @@
+{
+  "name": "archive-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal portfolio and working archive of Omid Abduli",
+  "scripts": {
+    "dev": "node --watch scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
