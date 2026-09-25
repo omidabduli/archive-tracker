@@ -85,12 +85,13 @@ export function escapeHtml(value) {
 const number = (index) => String(index + 1).padStart(2, "0");
 const arrow = '<svg viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>';
 
-// Rows in the "Selected work" section of the homepage.
+// Rows in the "Selected work" section of the homepage. A row opens the live
+// project if there is one, otherwise the repository.
 export function renderWorkRows(projects) {
   return projects.map((project, index) => {
-    const tags = ["GitHub", ...project.tags.slice(0, 3)].map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("");
+    const tags = [project.demoUrl ? "Live demo" : "GitHub", ...project.tags.slice(0, 3)].map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("");
     return `
-      <a class="project reveal" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer"><span class="project-no">${number(index)}</span><h3>${escapeHtml(project.name)}</h3><div class="project-copy"><p>${escapeHtml(project.description)}</p><div class="tags">${tags}</div></div><span class="project-arrow" aria-hidden="true">${arrow}</span></a>`;
+      <a class="project reveal" href="${escapeHtml(project.demoUrl || project.repository)}" target="_blank" rel="noopener noreferrer"><span class="project-no">${number(index)}</span><h3>${escapeHtml(project.name)}</h3><div class="project-copy"><p>${escapeHtml(project.description)}</p><div class="tags">${tags}</div></div><span class="project-arrow" aria-hidden="true">${arrow}</span></a>`;
   }).join("");
 }
 

@@ -37,7 +37,8 @@ All public repositories owned by the user, newest first, except:
 | --- | --- |
 | Name | The README's first heading, without emoji and without a subtitle after a dash (`# 🏔️ Everest — Spatial Editor` becomes "Everest"); otherwise the repository name with dashes turned into spaces. |
 | Description | The repository's GitHub description (**About**). |
-| Tags | The main language plus the repository topics, up to four. The homepage shows the first three after "GitHub". |
+| Tags | The main language plus the repository topics, up to four. The homepage shows the first three after "Live demo" or "GitHub". |
+| Homepage link | The live project if there is one ("Open live" below), otherwise the repository. |
 | "Open live" | The repository's website field (**About → Website**), or its GitHub Pages site if Pages is enabled. |
 | Order | Newest repository first. |
 
