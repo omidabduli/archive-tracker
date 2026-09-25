@@ -1,22 +1,15 @@
 {
-  "projects": [
-    {
-      "slug": "lake-simulation-timeseries",
+  "github": "omidabduli",
+  "exclude": ["archive-tracker"],
+  "overrides": {
+    "lake-simulation-timeseries": {
       "name": "Time-Series Forecasting",
-      "description": "Environmental time-series simulation with data auditing, XGBoost modelling, scenario comparison, and SHAP explainability.",
-      "repository": "https://github.com/omidabduli/lake-simulation-timeseries",
-      "branch": "main",
-      "status": "source",
+      "description": "An environmental time-series engine for testing scenarios, auditing data, and explaining model behavior—not simply producing a prediction.",
       "tags": ["Python", "XGBoost", "SHAP", "Environmental data"]
     },
-    {
-      "slug": "everest-coordinate-editor",
+    "everest-coordinate-editor": {
       "name": "Everest Coordinate Editor",
-      "description": "In-browser spatial coordinate editor, point-cloud transformer, and AI-powered CRS detection workspace for MIKE by DHI & GIS data workflows.",
-      "repository": "https://github.com/omidabduli/everest-coordinate-editor",
-      "branch": "main",
-      "status": "source",
       "tags": ["GIS", "Spatial Data", "MIKE by DHI", "Point Cloud"]
     }
-  ]
+  }
 }

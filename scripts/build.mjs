@@ -1,12 +1,14 @@
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const publicDirectory = resolve(root, "public");
 const outputDirectory = resolve(root, "dist");
-const projectsFile = resolve(root, "project-lab", "projects.json");
+const settingsFile = resolve(root, "project-lab", "projects.json");
 const templateExtensions = new Set([".html", ".xml", ".txt"]);
+const { buildProjects, fetchRepositories, renderLabCards, renderLabCount, renderPageData, renderWorkRows, selectRepositories } =
+  await import(pathToFileURL(resolve(publicDirectory, "assets", "projects.js")));
 
 // Full URL the site is served from, always ending in "/". The GitHub Pages
 // workflow passes the Pages URL (https://USERNAME.github.io/REPOSITORY/ or a
@@ -21,48 +23,57 @@ export function getSiteUrl() {
   return url;
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+// First heading of a README, without emoji, links or a subtitle after a dash:
+// "# 🏔️ Everest — Spatial Coordinate Editor" -> "Everest".
+function readmeTitle(markdown) {
+  const text = markdown.replace(/```[\s\S]*?```/g, "");
+  const heading = [text.match(/^#[ \t]+(.+)$/m), text.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)]
+    .filter(Boolean)
+    .sort((a, b) => a.index - b.index)[0]?.[1] ?? "";
+  const title = heading
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/[\p{Extended_Pictographic}\u200d\ufe0f]/gu, "")
+    .replace(/[*_`]/g, "")
+    .split(/\s+[—–|]\s+/)[0]
+    .trim();
+  return title.length <= 60 ? title : "";
+}
+
+// Repository data, kept between rebuilds of `npm run dev` so editing a file
+// does not use up GitHub's rate limit (60 requests an hour without a token).
+let githubCache;
+
+async function loadGitHub(settings) {
+  if (githubCache?.user === settings.github) return githubCache;
+  const token = process.env.GITHUB_TOKEN;
+  const repositories = await fetchRepositories(settings.github, { token });
+  const headers = { Accept: "application/vnd.github.raw+json", ...(token && { Authorization: `Bearer ${token}` }) };
+  const titles = {};
+  await Promise.all(selectRepositories(repositories, settings).map(async (repository) => {
+    const response = await fetch(`https://api.github.com/repos/${settings.github}/${repository.name}/readme`, { headers });
+    if (response.ok) titles[repository.name.toLowerCase()] = readmeTitle(await response.text()) || undefined;
+  }));
+  githubCache = { user: settings.github, repositories, titles };
+  return githubCache;
 }
 
 async function loadProjects() {
-  const parsed = JSON.parse(await readFile(projectsFile, "utf8"));
-  const projects = Array.isArray(parsed.projects) ? parsed.projects : [];
-  for (const project of projects) {
-    if (project.status === "live" && !project.demoUrl) {
-      throw new Error(`Project "${project.slug}" is marked live but has no demoUrl. GitHub Pages cannot run server-side demos, so host the demo elsewhere and link it with demoUrl.`);
-    }
+  const settings = JSON.parse(await readFile(settingsFile, "utf8"));
+  if (!settings.github) throw new Error(`${settingsFile} needs a "github" user name.`);
+  try {
+    const { repositories, titles } = await loadGitHub(settings);
+    return { settings, projects: buildProjects(repositories, settings, titles) };
+  } catch (error) {
+    // A deploy must not replace the live site with an empty list.
+    if (process.env.GITHUB_ACTIONS === "true") throw error;
+    console.warn(`Could not load repositories from GitHub (${error.message}); building without them. The pages still load them in the browser.`);
+    return { settings, projects: [] };
   }
-  return projects;
 }
 
-function renderProjectLab(projects) {
-  const cards = projects.map((project, index) => {
-    const isLive = project.status === "live";
-    const status = isLive ? "Live demo" : project.status === "planned" ? "Preparing demo" : "Source available";
-    const liveLink = isLive
-      ? `<a class="button primary" href="${escapeHtml(project.demoUrl)}" target="_blank" rel="noopener noreferrer">Open live &#xFE0E;↗</a>`
-      : "";
-    return `
-      <article class="project">
-        <div class="number">${String(index + 1).padStart(2, "0")}</div>
-        <div>
-          <div class="status ${isLive ? "online" : ""}"><span></span>${escapeHtml(status)}</div>
-          <h2>${escapeHtml(project.name)}</h2>
-          <p>${escapeHtml(project.description)}</p>
-          <div class="tags">${project.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
-        </div>
-        <div class="actions">
-          ${liveLink}
-          <a class="button" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer">View code &#xFE0E;↗</a>
-        </div>
-      </article>`;
-  }).join("");
-
+function renderProjectLab(settings, projects) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -93,9 +104,17 @@ function renderProjectLab(projects) {
   <main class="shell">
     <header><a class="brand" href="../">Archive Tracker</a><a class="back" href="../">Back to portfolio</a></header>
     <section class="intro"><div class="eyebrow">Project Lab / Experiments in public</div><h1>Code you can<br><em>actually open.</em></h1><p>Small tools, working prototypes, and ongoing experiments. Live demos are isolated from the main site and may change as I learn.</p></section>
-    <section>${cards}</section>
-    <footer><span>Built in public by Omid Abduli</span><span>${projects.length} repositories / ${projects.filter((item) => item.status === "live").length} live</span></footer>
+    <section id="lab-list">${renderLabCards(projects)}</section>
+    <footer><span>Built in public by Omid Abduli</span><span id="lab-count">${renderLabCount(projects)}</span></footer>
   </main>
+  ${renderPageData(settings, projects)}
+  <script type="module">
+    import { refreshFromGitHub, renderLabCards, renderLabCount } from "../assets/projects.js";
+    refreshFromGitHub((projects) => {
+      document.getElementById("lab-list").innerHTML = renderLabCards(projects);
+      document.getElementById("lab-count").textContent = renderLabCount(projects);
+    });
+  </script>
 </body>
 </html>`;
 }
@@ -112,21 +131,25 @@ async function fillTemplates(directory, values) {
 
 export async function build() {
   const siteUrl = getSiteUrl();
-  const projects = await loadProjects();
+  const { settings, projects } = await loadProjects();
 
   await rm(outputDirectory, { recursive: true, force: true });
   // Dotfiles are skipped, matching what actions/upload-pages-artifact publishes.
   await cp(publicDirectory, outputDirectory, { recursive: true, filter: (source) => !basename(source).startsWith(".") });
-  await fillTemplates(outputDirectory, { "%SITE_URL%": siteUrl.href, "%BASE_PATH%": siteUrl.pathname });
+  await fillTemplates(outputDirectory, {
+    "%SITE_URL%": siteUrl.href,
+    "%BASE_PATH%": siteUrl.pathname,
+    "<!-- work-rows -->": renderWorkRows(projects),
+    "<!-- archive-data -->": renderPageData(settings, projects)
+  });
 
   await mkdir(join(outputDirectory, "projects"), { recursive: true });
-  await writeFile(join(outputDirectory, "projects", "index.html"), renderProjectLab(projects), "utf8");
+  await writeFile(join(outputDirectory, "projects", "index.html"), renderProjectLab(settings, projects), "utf8");
 
   await mkdir(join(outputDirectory, "api"), { recursive: true });
-  const publicProjects = projects.map(({ port: hiddenPort, ...project }) => project);
-  await writeFile(join(outputDirectory, "api", "project-lab.json"), JSON.stringify(publicProjects), "utf8");
+  await writeFile(join(outputDirectory, "api", "project-lab.json"), JSON.stringify(projects), "utf8");
 
-  console.log(`Built Archive Tracker for ${siteUrl.href} into dist/`);
+  console.log(`Built Archive Tracker for ${siteUrl.href} with ${projects.length} projects into dist/`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
