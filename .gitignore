@@ -43,7 +43,5 @@ Thumbs.db
 .vscode/
 
 # Local tool state
-.sites/
-.agents/
-.openai/
-.claude/
+.*/
+!.github/

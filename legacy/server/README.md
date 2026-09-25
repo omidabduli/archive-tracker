@@ -22,8 +22,8 @@ unchanged.
 The scripts expect the pre-migration layout (`server.js`, the `.command` files
 and `project-lab/runtime/` at the repository root) and a local `.env` with
 `domain` (SSH/site user), `port`, `site-user-password`, `domain-name` and
-`server-ip`. They do not run from this folder. To go back to the server version,
-follow "How to roll back" in `MIGRATION_TO_GITHUB_PAGES.md`.
+`server-ip`. They do not run from this folder; to go back to the server version,
+move them back to the repository root.
 
 Requirements: `express@^4.19.2` and `dotenv@^16.4.5` (from the old
 `package.json`), `sshpass` and `rsync` locally, Node.js with `pm2` on the

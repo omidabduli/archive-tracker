@@ -49,10 +49,7 @@ sshpass -p "$SITE_PASSWORD" ssh \
 
 echo "Uploading the new site..."
 sshpass -p "$SITE_PASSWORD" rsync -az --delete \
-  --exclude='.env' \
-  --exclude='.git' \
-  --exclude='.agents' \
-  --exclude='.openai' \
+  --exclude='.*' \
   --exclude='dist' \
   --exclude='node_modules' \
   --exclude='scripts' \
